@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang='en' dir='ltr'>
   <head>
-    <title>Olivia Fryt | Web Automation with HTTP Content</title>
+    <title>Olivia Fryt | Browser Automation with HTTP Content</title>
 
     <!-- Meta -->
     <meta charset='utf-8'>
@@ -13,11 +13,14 @@
 
     <!-- Style  -->
     <link rel='stylesheet' type='text/css' href='../style/style.css'>
+
+    <!-- Google Prettify -->
+    <script src="https://cdn.jsdelivr.net/gh/google/code-prettify@master/loader/run_prettify.js"></script>
   </head>
 
     <body>
       <div class='nav'>
-        <a href='./about.html'>About</a>
+        <a href='../about.html'>About</a>
         <a href='https://github.com/frytoli'>Github</a>
         <a href='../index.html'>Home</a>
       </div>
@@ -25,14 +28,107 @@
         <div class='section post-title' id='proxied_mobilenium'>
           <div class='section-content'>
             <p>
-              Web Automation with HTTP Content<br>
-              <text class='post-title-date'>05/11/2020 00:00:00</text>
+              Browser Automation with HTTP Content<br>
+              <text class='post-title-date'>12/11/2020 21:27:24</text>
             </p>
           </div>
         </div>
         <div class='post-content-wrapper'>
           <div class='post-content'>
-            Coming Soon!
+            I've been meaning to write this post for seven months to the day... better late than never!
+            <br>
+            <br>
+            Sometimes I come across situations where I'd like to use web browser automation with the simultaneous ability to edit and/or read HTTP information. Believe it or not, retrieving HTTP data from something like a Selenium is not innately possible.
+I did, however, find a pretty awesome solution (for Python) called <a href='https://github.com/rafpyprog/Mobilenium'>Mobilenium</a>. It uses <a href='https://github.com/AutomatedTester/browsermob-proxy-py'>browsermob-proxy-py</a> (a python wrapper around
+the Java application <a href='https://github.com/lightbody/browsermob-proxy'>BrowserMob Proxy</a> powered by <a href='https://github.com/adamfisk/LittleProxy'>LittleProxy</a>). Mobilenium is pretty awesome and works by starting up a local BrowserMob Proxy instance through which
+it sends any traffic from Selenium. The BrowserMob Proxy captures and records all HTTP requests and responses made by the web driver. This was all certainly a step in the right direction for me, but it was, however, unfortunately missing just one capability
+I needed: proxy capability. More specifically, since BrowserMob Proxy is a proxy, I effectively needed a proxy-chaining capability -- so my Selenium traffic would be sent through BrowserMob and then through another proxy to my target, and then back. Like this:
+          <br><br>
+          <div style="height:350px;">
+            <img style='height:350px;' src='../images/proxiedmobilenium.png'>
+          </div>
+          <br><br>
+          <b>Spoiler alert:</b> I was able to add this capability to Mobilenium. That all you needed to hear? Cool beans! My code (with an example) is in <a href='https://github.com/frytoli/proxied-mobilenium'>this repo</a>.
+          <br>
+          <br>
+          I'm not going to go into too much detail about how I managed to do so because it's not too important and was only more of a production because of the list of dependencies that I
+previously mentioned. I also didn't change much of any of these projects at all - the original authors crushed it. LittleProxy, the ultimate powerhouse behind all of the applications in use here, does have proxy-chaining capability already built in (thank goodness!). Therefore, adding this capability to Mobilenium required "statically reverse engineering"
+(really just combing through the code) the Mobilenium project, then the browsermob-proxy-py project, then the BrowserMob Proxy project, and finally LittleProxy. The real pain points were the BrowserMob Proxy and LittleProxy because of the fact that they're written
+in Java and therefore made up of an inordinate amount of code and files. However, thanks to GitHub's repository search tools and grep I was able to find what I was looking for, make appropriate changes to the code, build my version of BrowserMob Proxy from source,
+implement this custom build of BrowserMob Proxy, and ring that victory bell 🔔!
+          <h2>Proxied Mobilenium</h2>
+          My custom version of Mobilenium provides the capability to set an "upstream proxy" (HTTP, HTTPS, SOCKS4, or SOCKS5). Implementing this capability is pretty simple. Let's use Selenium with Firefox's Geckodriver and Tor as our upstream proxy, as an example. Remeber that the Geckodriver
+needs to be downloadded and the executable needs to be in your PATH, Tor needs to be running in the background, and Tor is a SOCKS5 proxy. These requirements can easily be handled in a container. I've got a Dockerfile in my repo that takes care of all of this.<br>
+          <br>
+          Let's open an empty ptyhon file and begin by importing our requirements:
+          <pre class='prettyprint'><code class='language-py'>
+from selenium.webdriver.firefox.options import Options
+from Mobilenium.mobilenium import mobidriver
+from selenium import webdriver
+import os
+          </code></pre>
+          You can customize your Firefox profile if you'd like. I'll set my profile to open in "Private Browsing Mode":
+          <pre class='prettyprint'><code class='language-py'>
+# Customize Firefox profile
+profile = webdriver.FirefoxProfile()
+# Set Private Browsing Mode on browser startup
+profile.set_preference('browser.privatebrowsing.autostart', True)
+# Update preferences
+profile.update_preferences()
+          </code></pre>
+          Now, let's use Mobilenium to initialize a <i>mobidriver</i> object. This is actually where most of the magic happens (which is fantastic because it's simple). We'll explicitly set the object's <i>browsermob_binary</i> to the custom BrowserMob Proxy application we
+built from source (check my <a href='https://github.com/frytoli/proxied-mobilenium'>repo</a> to better understand the project's structure if you're confused about this path), explicitly set our custom firefox profile, in this case set the optional argument <i>headless</i>
+to <i>True</i> so that our browser runs in headless mode, and finally set our upstream proxy to Tor:
+          <pre class='prettyprint'><code class='language-py'>
+# Initialize driver
+mob = mobidriver.Firefox(browsermob_binary='browsermob-proxy-SNAPSHOT/bin/browsermob-proxy', firefox_profile=profile, headless=True, upstream_proxy={'socks5Proxy':'127.0.0.1:9050'})
+          </code></pre>
+One line. I love it!
+<br>
+<br>
+Finally, we'll use our <i>mobidriver</i>! I'm going to tell it to navigate to the Tor Project check page, take and save a screenshot, and output the HTTP response. Also note that <i>mobidriver</i> usage is very similar to a pure Selenium webdriver's usage. In fact, in this case it's
+exactly the same:
+          <pre class='prettyprint'><code class='language-py'>
+# Navigate to page
+mob.get('http://check.torproject.org/')
+# Take and save screenshot
+mob.save_screenshot('screenshot.png')
+# Output http response data
+print(mob.response)
+          </code></pre>
+          Success! Here's the printed returned HTTP response from this test:
+          <pre class='prettyprint'><code class='language-py'>
+{'status': 301, 'statusText': 'Moved Permanently', 'httpVersion': 'HTTP/1.1', 'cookies': [], 'headers': [{'name': 'Date', 'value': 'Sat, 12 Dec 2020 03:05:18 GMT'}, {'name': 'Server', 'value': 'Apache'}, {'name': 'X-Content-Type-Options', 'value': 'nosniff'}, {'name': 'X-Frame-Options', 'value': 'sameorigin'}, {'name': 'X-Xss-Protection', 'value': '1'}, {'name': 'Referrer-Policy', 'value': 'no-referrer'}, {'name': 'Location', 'value': 'https://check.torproject.org/'}, {'name': 'Content-Length', 'value': '307'}, {'name': 'Content-Type', 'value': 'text/html; charset=iso-8859-1'}], 'content': {'size': 0, 'mimeType': 'text/html; charset=iso-8859-1', 'comment': ''}, 'redirectURL': 'https://check.torproject.org/', 'headersSize': 309, 'bodySize': 307, 'comment': ''}
+          </code></pre>
+          And, here's our screenshot for proof that we're successfully sending our traffic through Tor:
+          <br>
+          <br>
+          <div style="height:400px;">
+            <img style='height:400px;' src='../images/pm_screenshot.png'>
+          </div>
+          <br>
+          <br>
+          Additionally, BrowserMob Proxy, LittleProxy, and Geckodriver all create and write to output logs, and the information can be very helpful for debugging and/or monitoring performance.
+          <br>
+          <br>
+          One more thing I'd like to mention is that Python Selenium is not great at closing down in entirety when it's asked to. So, as ugly and sketchy as this is, I deal with this problem by first signaling to the driver to quit and then killing any lingering processes.
+It looks like this:
+          <pre class='prettyprint'><code class='language-py'>
+import psutil
+import time
+
+# Quit driver
+mob.quit_all()
+# Kill firefox
+for proc in psutil.process_iter():
+    if 'firefox-esr' in proc.name():
+        proc.kill()
+time.sleep(3)
+          </code></pre>
+Totally ugly, but totally working, and also totally optional.
+          <br>
+          <br>
+          There you have it -- the <i>sights</i> and <i>sounds</i> of an automated web process. As I mentioned earlier, I Dockerized this code, and it's all available in my <a href='https://github.com/frytoli/proxied-mobilenium'>Proxied-Mobilenium</a> repo. Happy automating!
           </div>
         </div>
         <div class='section two'>

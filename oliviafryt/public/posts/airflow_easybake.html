@@ -13,11 +13,14 @@
 
     <!-- Style  -->
     <link rel='stylesheet' type='text/css' href='../style/style.css'>
+
+    <!-- Google Prettify -->
+    <script src="https://cdn.jsdelivr.net/gh/google/code-prettify@master/loader/run_prettify.js"></script>
   </head>
 
     <body>
       <div class='nav'>
-        <a href='./about.html'>About</a>
+        <a href='../about.html'>About</a>
         <a href='https://github.com/frytoli'>Github</a>
         <a href='../index.html'>Home</a>
       </div>
@@ -56,7 +59,7 @@
             as well, but you'd still need to entrypoint script and configuration file. Then, I opted to begin learning with a Local Executor, which according to Airflow management company Astronomer is the "easy option" (holla!) (Read more about Astronomer's explaination of Executors in their guide <a href='https://www.astronomer.io/guides/airflow-executors-explained/'>
             Airflow Executors: Explained</a>). To prepare for this I deleted <i>./docker-compose-CeleryExecutor.yml</i>, renamed <i>./docker-compose-CeleryExecutor.yml</i> to <i>docker-compose.yml</i>, and moved <i>docker-compose.yml</i> up a directory because that's how I like to organize my projects that use docker-compose. In doing so, I also
             changed the <i>volumes</i> path within the docker-compose yaml file to account for this structural reorganization by changing "./dags:/usr/local/airflow/dags" to "./airflow/dags:/usr/local/airflow/dags". So, at this point my new project looks like this (ignoring some of the unnecessary files):
-            <pre>
+            <pre class='prettyprint'>
 ├── airflow-eaysbake/
 |  ├── docker-compose.yml
 |  ├── airflow/
@@ -83,7 +86,7 @@
             <h2>Define the Recipe</h2>
             Let's start working on our code. Before touching any Airflow things, let's hardcode our recipe. Open up <i>easyflow_day.py</i> and add a recipe. I 100% just made this recipe up; the important thing is really just the structure as pieces of this recipe will be used by future code. Also, I hardcoded the "actual oven temperature" below the recipe
             to represent the cold oven temperature (before it has been pre-heated). I set this value to 65:
-            <pre>
+            <pre class='prettyprint'><code class='language-py'>
 '''
 The Cake Recipe:
 '''
@@ -103,18 +106,18 @@ recipe = {
     'required_temp' : 350
 }
 oven_temp = 65
-            </pre>
+            </code></pre>
             <h2>Stock the Pantry and Organize the Cabinets</h2>
             In the mindset of preparation, let's not add our pantry and cabinet code. I mentioned briefly above to consider these sources as tables in a "kitchen" database, each of which contains food items and cookwear items respectively. Because I don't feel like messing with taking time to set up a database, I'm going to ask y'all to use your 🌈 imagination 🌈.
             With that being said, I'm going to create two additional json files one of which will represent the pantry and the other will represent the cabinets. Create two <i>json</i> files within the <i>dags</i> directory named <i>pantry.json</i> and <i>cabinets.json</i>. The structure of the <i>dags</i> directory will then look like this:
-            <pre>
+            <pre class='prettyprint'><code class='language-py'>
 ├── airflow-eaysbake/airflow/dags/
 |  ├── cabinets.json
 |  ├── pantry.json
 |  └── easybake_dag.py
-            </pre>
+            </code></pre>
             Throw some data in the pantry file, for example:
-            <pre>
+            <pre class='prettyprint'><code class='language-py'>
 {
     "eggs": 12,
     "flour": 8,
@@ -122,18 +125,18 @@ oven_temp = 65
     "butter": 4,
     "water": 100
 }
-            </pre>
+            </code></pre>
             And some data in the cabinets file, like this:
-            <pre>
+            <pre class='prettyprint'><code class='language-py'>
 {
     "spoon": 2,
     "pan": 2,
     "mixer": 1
 }
-            </pre>
+            </code></pre>
             Then, let's write some "database connection" methods within our main file <i>easybake_dag.py</i>. Again, because of the fact that we're not actually connecting to a database these functions will just be reading/writing data from the json files we just created. Two things to note here: 1. we're using the <i>os</i> and <i>json</i> python packages here
             so we'll need to import those and 2. I'm using the environment variable <i>AIRFLOW_HOME</i> to accurately identify the path to our files. <i>AIRFLOW_HOME</i> is defined and set in the <i>entrypoint.sh</i> script that is run upon entrypoint to the Docker container, and this script sets this variable to <i>"/usr/local/airflow"</i>.
-            <pre>
+            <pre class='prettyprint'><code class='language-py'>
 '''
 Pantry and Cabinet Access Functions
 (Consider these as database communication functions)
@@ -166,11 +169,11 @@ def write_cabinets(items):
     cabinets_file = os.path.join(os.environ.get('AIRFLOW_HOME'),'dags','cabinets.json')
     with open(cabinets_file,'w') as outjson:
         json.dump(items, outjson, indent=4)
-            </pre>
+            </code></pre>
             <h2>I DAG It</h2>
             Now we're going to begin translating the skeleton of our conceptual cake-baking workflow into a DAG for use by Airflow. In my code I like to put anything related to my DAG at the bottom of my file, so I'm now going to add a comment and a couple lines after my pantry/cabinet access functions to act as a placeholder for the methods my DAG is going to
             leverage to get its jobs done. Then, I'm going to begin writing my DAG code:
-            <pre>
+            <pre class='prettyprint'><code class='language-py'>
 '''
 Cake Baking Methods:
 '''
@@ -182,18 +185,18 @@ Cake Baking Methods:
 '''
 The DAG
 '''
-            </pre>
+            </code></pre>
             Now, let's import the necessary modules for our DAG:
-            <pre>
+            <pre class='prettyprint'><code class='language-py'>
 from airflow.operators.python_operator import BranchPythonOperator
 from airflow.operators.python_operator import PythonOperator
 from airflow.operators.bash_operator import BashOperator
 from airflow import DAG
 import datetime
-            </pre>
+            </code></pre>
             And now let's define our DAG's <a href='https://airflow.apache.org/docs/stable/concepts.html#default-arguments'>default arguments</a>. A default arguments dictionary is optional, and if one is defined and passed to a DAG the arguments will be applied to all of the DAG's operators. A list of these optional arguments can be found in the documentation
             <a href='https://airflow.apache.org/docs/stable/_api/airflow/models/index.html#airflow.models.BaseOperator'>here</a>. My default arguments dictionary is as follows:
-            <pre>
+            <pre class='prettyprint'><code class='language-py'>
 # Define the default arguments
 default_args = {
     'owner': 'airflow',
@@ -205,7 +208,7 @@ default_args = {
     'retry_delay': datetime.timedelta(seconds=5),
     'task_concurrency': 1
 }
-            </pre>
+            </code></pre>
             I've set the argument <i>"owner"</i> to <i>"airflow"</i> as is common in example Airflow DAGs. The argument <i>"depends_on_past"</i> is set to <i>False</i> which tells the DAG that it is not necessary for tasks to rely on previous tasks' schedule to succeed. I have set <i>"start_date"</i> to January 1, 20202, with python's datetime package.
             I don't want to receive any emails, so I have set both <i>"email_on_failure"</i> and <i>"email_on_retry"</i> to <i>False</i>. Upon a failure, I am going to let the DAG retry the task instance one time and therefore have set <i>"retries"</i> to <i>1</i>, and I am going to require the DAG to wait five seconds before trying again as defined with
             <i>"retry_delay"</i> set to a datetime timedelta of <i>5</i> seconds. Lastly, I am going to limit the concurrent runs per execution date to one by setting <i>"taks_concurrency"</i> to <i>1</i>.
@@ -213,7 +216,7 @@ default_args = {
             <br>
             Now, let's actually define the DAG and initialize its operators. Begin be defining the DAG with a few descriptive and informative parameters. A list of optional parameters exists in the documentation <a href='https://airflow.apache.org/docs/stable/_api/airflow/models/index.html#airflow.models.DAG'>here</a>. Additionally, I like to use the
             <i>"with"</i> keyword when working with this defined DAG:
-            <pre>
+            <pre class='prettyprint'><code class='language-py'>
 # Define the DAG and its operators
 with DAG(
         dag_id='easybake',
@@ -222,7 +225,7 @@ with DAG(
         catchup=False,
         schedule_interval='@daily'
     ) as dag:
-            </pre>
+            </code></pre>
             I think the <i>"dag_id"</i> and <i>"description"</i> parameters are relatively self-explainatory. I've set <i>"default_args"</i> to the <i>"default_args"</i> dictionary that we've previously defined. I've set the <i>"catchup"</i> parameter to <i>False</i> to ensure that the DAG will not "catch up" to the current day by running enough task instances
             to make up for the lost time. And lastly, I've set the DAG's <i>"schedule_interval"</i> to <i>"@daily"</i> to tell the DAG to run the task instance just once per day -- we'll be either ultimately cranking out a cake, going shopping, or washing the dishes once a day.
             <br>
@@ -232,7 +235,7 @@ with DAG(
             the name of the python function that will be called when these operators are prompted to begin. We have yet to actually define these functions, but I plan on naming them <i>"get_ingredients"</i> and <i>"get_cookwear"</i> and I will reference them as such in the operator definitions. As well, these yet-to-be-defined functions set as the <i>"python_callable"</i>
             values will need to know the required ingredients and required cookwear items for the recipe. We'll pass that data to the functions as an argument that we'll name <i>"required"</i>. While we're here, let's define to place holder functions for use by these operators. I'll add them to the <i>"Cake Baking Methods"</i> section of our code that we
             skipped over. The bottom of our file should now look something like this:
-            <pre>
+            <pre class='prettyprint'><code class='language-py'>
 '''
 Cake Baking Methods:
 '''
@@ -281,10 +284,10 @@ with DAG(
         python_callable=get_cookwear,
         op_kwargs={'required':recipe['required_cookwear']}
     )
-            </pre>
+            </code></pre>
             If we continue on in this way, stepping through our conceptual plans we should define operators to return unused ingredients to the pantry, return unused cookwear items to the cabinets, go shopping, wash the dishes, preheat the oven, mix the ingredients, bake the cake, and lastly cool the cake. After doing so, our code will look something like this.
             Note 1. the inclusion of the global <i>oven_temp</i> variable in the functions for preheating the oven and baking the cake and 2. the use of <i>BashOperator</i> for the operators that mix the ingredients and cool the cake since the tasks simply output a string and sleep (I thought it'd be interesting to show examples of multiple operator types):
-            <pre>
+            <pre class='prettyprint'><code class='language-py'>
 
 '''
 Cake Baking Methods:
@@ -398,18 +401,18 @@ with DAG(
         python_callable=wash_dishes,
         op_kwargs={'required':recipe['required_cookwear']}
     )
-            </pre>
+            </code></pre>
             Let's now set up the dependencies for the tasks in our DAG. Dependencies can be defined either syntatically or with bitshift operators. Astronomer does a good job explaining these in detail in their article <a href='https://www.astronomer.io/guides/managing-dependencies/'>Managing Dependencies in Apache Airflow</a>. I like how bitshift operators
             look, so I used those. Our cake baking task instance begins with retrieving the required ingredients and retrieving the required cookwear items as specified in the recipe. These tasks can occur in tandem and doing so will contribute to the efficiency of our cake baking process. With bitshift operators, we can define tasks to run in parallel by
             organizing them as a group. Our DAG will begin as follows:
-            <pre>
+            <pre class='prettyprint'><code class='language-py'>
 [opr_get_ingredients, opr_get_cookwear] >>
-            </pre>
+            </code></pre>
             Now, the next step here is interesting. As defined in our conceptual workflow, our DAG's next step will depend on whether or not we have enough of the require ingredients and cookwear items. Three possible next steps exist depending upon the results of the first two parallel tasks. Therefore, we need to define a branch task and operator to handle
             making this decision. As such, let's have our <i>get_ingredients</i> and <i>get_cookwear</i> functions return <i>True</i> if all required ingredients/cookwear items were successfully gathered from the pantry/cabinets and <i>False</i> if NOT all required ingredients/cookwear items were successfully gathered from the pantry/cabinets. Now, let's add
             a <i>BranchPythonOperator</i> to our list of defined operators. <a href='https://airflow.apache.org/docs/stable/concepts.html?highlight=branch#branching'>Branch Operators</a> evaluate an arbitrary conditional, which is typically related to a previously completed task, and identifies the next task/path to follow. Because our Branch Operator will
             require the returned values of the first two tasks, we'll need to specifiy <i>"provide_context"</i> to be <i>True</i>:
-            <pre>
+            <pre class='prettyprint'><code class='language-py'>
     .
     .
     .
@@ -421,19 +424,19 @@ with DAG(
         python_callable=branch,
         provide_context=True
     )
-            </pre>
+            </code></pre>
             Next we'll define the actual <i>branch</i> method. This will take into account the results of the two previous tasks <i>get_ingredients</i> and <i>get_cookwear</i> and return the next task(s) to proceed with. We will retrieve the results of the two previous tasks with <a href='https://airflow.apache.org/docs/stable/concepts.html?highlight=xcom#xcoms'>Xcoms</a>.
             The beginning of the function will look like this:
-            <pre>
+            <pre class='prettyprint'><code class='language-py'>
 # Branch function
 def branch(**kwargs):
     # Retrieve the returned values of the get_ingredients and get_cookwear operators
     have_ingredients = kwargs['ti'].xcom_pull(task_ids='get_ingredients')
     have_cookwear = kwargs['ti'].xcom_pull(task_ids='get_cookwear')
-            </pre>
+            </code></pre>
             If we have successfully grabbed enough of the required ingredients and cookwear items, we can continue on to bake the cake. Before the cake is actually baked we need to preheat the oven and mix the ingredients. Because these two tasks are not dependent on each other in any way, they can happen in tandem. Therefore, if we have successfully grabbed
             enough of the required ingredients and cookwear items, the branching function can tell the DAG to preheat the oven and mix the ingredients in parallel by returning these two task's ids in a list:
-            <pre>
+            <pre class='prettyprint'><code class='language-py'>
 # Branch function
 def branch(**kwargs):
     # Retrieve the returned values of the get_ingredients and get_cookwear operators
@@ -442,9 +445,9 @@ def branch(**kwargs):
     # If both the required ingredient and cookwear needs have been met, continue to mixing the batter
     if have_ingredients and have_cookwear:
         return(['preheat_oven', 'mix_ingredients'])
-            </pre>
+            </code></pre>
             Else, if we have NOT successfully grabbed enough of the required ingredients and we have NOT successfully grabbed enough of the required cookwear items, have the branching function tell the DAG to go shopping and wash the dishes:
-            <pre>
+            <pre class='prettyprint'><code class='language-py'>
 # Branch function
 def branch(**kwargs):
     # Retrieve the returned values of the get_ingredients and get_cookwear operators
@@ -456,9 +459,9 @@ def branch(**kwargs):
     # Else if the required ingredient needs have NOT been met AND the cookwear needs have NOT been met, go shopping and wash the dishes
     elif not have_ingredients and not have_cookwear:
         return(['go_shopping', 'wash_dishes'])
-            </pre>
+            </code></pre>
             Else, if we have NOT successfully grabbed enough of the required ingredients and we have successfully grabbed enough of the required cookwear items, go shopping and return the unused cookwear items to the cabinets:
-            <pre>
+            <pre class='prettyprint'><code class='language-py'>
 # Branch function
 def branch(**kwargs):
     # Retrieve the returned values of the get_ingredients and get_cookwear operators
@@ -473,9 +476,9 @@ def branch(**kwargs):
     # Else if the required ingredient needs have NOT been met BUT the cookwear needs have been met, go shopping and return the cookwear to the cabinets
     elif not have_ingredients and have_cookwear:
         return(['go_shopping', 'return_cookwear'])
-            </pre>
+            </code></pre>
             And finally, else if we have successfully grabbed enough of the required ingredients and we have NOT successfully grabbed enough of the required cookwear items, return the unused ingredients to the pantry (wasting isn't cool!) and wash the dishes:
-            <pre>
+            <pre class='prettyprint'><code class='language-py'>
 # Branch function
 def branch(**kwargs):
     # Retrieve the returned values of the get_ingredients and get_cookwear operators
@@ -493,24 +496,24 @@ def branch(**kwargs):
     # Else if the required ingredient needs have been met BUT the cookwear needs have NOT been met, wash the dishes and return the ingredients to the pantry
     elif not have_cookwear and have_ingredients:
         return(['wash_dishes', 'return_ingredients'])
-            </pre>
+            </code></pre>
             Now, let's hop back to our DAG dependencies and continue to build out that same logic while incorporating our branching operator. The finished graph should look like this:
-            <pre>
+            <pre class='prettyprint'><code class='language-py'>
 # Define the DAG structure
 [opr_get_ingredients, opr_get_cookwear] >> opr_branch
 opr_branch >> [opr_preheat_oven, opr_mix_ingredients] >> opr_bake_cake >> opr_cool_cake >> opr_wash_dishes
 opr_branch >> [opr_go_shopping, opr_wash_dishes]
 opr_branch >> [opr_go_shopping, opr_return_cookwear]
 opr_branch >> [opr_wash_dishes, opr_return_ingredients]
-            </pre>
+            </code></pre>
             <h2>The Science to Baking</h2>
             Welp, we've covered most of the Airflow bits and now all that's left is the actual logic for the Python methods which I'm not going to cover because it's not anything fancy. In fact, I'll just give the finished code to you: <a href='https://github.com/frytoli/airflow-easybake/blob/749d4b63077d8b164cdf96f04f0edfbadd434002/airflow/dags/easybake_dag.py'><b>easybake_dag.py</b></a>.
             The only thing to really note here is my use of the <i>logger</i> python package. Airflow has logging setup by default which makes implementing outputting with logger as simple as replacing any <i>print</i> statements with logging statements like <i>logging.info</i> as is shown in my code.
             <h2>Mmm Mmm</h2>
             Now let's run the containers (Airflow's webserver and postgress metadata database) and test our DAG. Run the following command in the root directory (eaysbake_airflow/):
-            <pre>
+            <pre class='prettyprint'><code class='language-py'>
 docker-compose build && docker-compose up -d
-            </pre>
+            </code></pre>
             Once the containers are up, navigate in your browser to localhost:8080. The page should look something like this:
             <div style="height:400px;">
             	<img src='../images/airflow1.png'>
@@ -526,16 +529,16 @@ docker-compose build && docker-compose up -d
             	<img src='../images/airflow3.png'>
             </div>
             When viewing the logs for a given task, we can see our output we hardcoded in our operator methods. For example, after successful completion of the <i>"go_shopping"</i> task, the associated logs show:
-            <pre>
+            <pre class='prettyprint'><code class='language-py'>
 INFO - [YYYY-MM-DD HH:MM:SS,FFF] {{easybake_dag.py:172}} INFO - Purchased 2x ingredient eggs
 INFO - [YYYY-MM-DD HH:MM:SS,FFF] {{easybake_dag.py:172}} INFO - Purchased 2x ingredient flour
 INFO - [YYYY-MM-DD HH:MM:SS,FFF] {{easybake_dag.py:172}} INFO - Purchased 1x ingredient sugar
 INFO - [YYYY-MM-DD HH:MM:SS,FFF] {{easybake_dag.py:172}} INFO - Purchased 1x ingredient butter
-            </pre>
+            </code></pre>
             If left to run, this task instance will prompt itself and run again each day until it is stopped. To shut down the containers run:
-            <pre>
+            <pre class='prettyprint'><code class='language-py'>
 docker-compose down
-            </pre>
+            </code></pre>
             Pretty neat right!! There's plenty more to learn and explore, but this exercise familiarized me enough with Airflow for the meantime. I hope it has helped you too! Thanks for reading. Now, go take a walk. I sure as heck am.
           </div>
         </div>
